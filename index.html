@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Priority Intelligence v3.0</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 40px; }
+        .grid { display: grid; grid-template-columns: 320px 1fr; gap: 25px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .task { display: flex; justify-content: space-between; align-items: center; padding: 15px; margin-bottom: 12px; border-radius: 8px; border-left: 6px solid #ccc; background: white; }
+        .High { border-color: #ff4d4d; } .Medium { border-color: #ffcc00; } .Low { border-color: #2ecc71; }
+        .completed { opacity: 0.4; text-decoration: line-through; background: #e9ecef; }
+        #searchBar { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        #editModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; }
+        .modal-content { background:white; padding:30px; border-radius:12px; width:400px; }
+        input, select, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        .action-btn { width: auto; padding: 5px 10px; color: white; border: none; cursor: pointer; margin-left: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🚦 Priority Intelligence v3.0</h1>
+    <div class="grid">
+        <div class="card">
+            <h3>Add Task</h3>
+            <input type="text" id="tInput" placeholder="Task description...">
+            <input type="date" id="dInput" value="2026-03-02">
+            <input type="time" id="timeInput" value="12:00">
+            <select id="pInput">
+                <option value="High">High Priority</option>
+                <option value="Medium">Medium Priority</option>
+                <option value="Low">Low Priority</option>
+            </select>
+            <button style="background:#007bff; color:white;" onclick="add()">Save Task</button>
+        </div>
+        <div>
+            <input type="text" id="searchBar" onkeyup="filter()" placeholder="🔍 Search tasks or priorities...">
+            <div id="taskList"></div>
+        </div>
+    </div>
+
+    <div id="editModal">
+        <div class="modal-content">
+            <h3>Edit Task</h3>
+            <input type="hidden" id="editId">
+            <input type="text" id="editT">
+            <input type="date" id="editD">
+            <input type="time" id="editTime">
+            <select id="editP">
+                <option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option>
+            </select>
+            <button onclick="saveEdit()" style="background:#007bff; color:white;">Update</button>
+            <button onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000/todos';
+        let allTasks = [];
+
+        async function fetchAll() {
+            const res = await fetch(API);
+            allTasks = await res.json();
+            render(allTasks);
+        }
+
+        function filter() {
+            const q = document.getElementById('searchBar').value.toLowerCase();
+            render(allTasks.filter(t => t.text.toLowerCase().includes(q) || t.priority.toLowerCase().includes(q)));
+        }
+
+        function render(tasks) {
+            document.getElementById('taskList').innerHTML = tasks.map(t => `
+                <div class="task ${t.priority} ${t.completed ? 'completed' : ''}">
+                    <div>
+                        <strong>${t.text}</strong><br>
+                        <small>📅 ${t.dueDate} | 🕒 ${t.dueTime}</small>
+                    </div>
+                    <div>
+                        <button class="action-btn" style="background:#6c757d" onclick="openEdit(${t.id},'${t.text}','${t.dueDate}','${t.dueTime}','${t.priority}')">Edit</button>
+                        <button class="action-btn" style="background:#28a745" onclick="toggle(${t.id},${t.completed})">✓</button>
+                        <button class="action-btn" style="background:#dc3545" onclick="del(${t.id})">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function add() {
+            const body = { text: document.getElementById('tInput').value, priority: document.getElementById('pInput').value, dueDate: document.getElementById('dInput').value, dueTime: document.getElementById('timeInput').value };
+            await fetch(API, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            fetchAll();
+        }
+
+        async function toggle(id, status) {
+            await fetch(`${API}/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ completed: !status }) });
+            fetchAll();
+        }
+
+        async function del(id) {
+            await fetch(`${API}/${id}`, { method: 'DELETE' });
+            fetchAll();
+        }
+
+        function openEdit(id, t, d, time, p) {
+            document.getElementById('editId').value = id; document.getElementById('editT').value = t;
+            document.getElementById('editD').value = d; document.getElementById('editTime').value = time;
+            document.getElementById('editP').value = p; document.getElementById('editModal').style.display = 'flex';
+        }
+
+        async function saveEdit() {
+            const id = document.getElementById('editId').value;
+            const body = { text: document.getElementById('editT').value, dueDate: document.getElementById('editD').value, dueTime: document.getElementById('editTime').value, priority: document.getElementById('editP').value };
+            await fetch(`${API}/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            document.getElementById('editModal').style.display = 'none';
+            fetchAll();
+        }
+
+        fetchAll();
+    </script>
+</body>
+</html>
